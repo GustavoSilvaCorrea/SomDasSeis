@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Som da Seis • Duelo 21</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <section id="lobby" class="panel lobby">
+      <div class="brand-kicker">SOM DA SEIS</div>
+      <h1>Duelo 21</h1>
+      <p class="sub">Entre numa mesa, enfrente outro jogador e use triunfos para quebrar as regras.</p>
+
+      <label>Seu nome</label>
+      <input id="name" maxlength="20" placeholder="Ex.: Gustavo" />
+
+      <div class="lobby-actions">
+        <button id="createBtn" class="primary">Criar sala</button>
+        <div class="join-box">
+          <input id="roomCode" maxlength="5" placeholder="CÓDIGO" />
+          <button id="joinBtn">Entrar</button>
+        </div>
+      </div>
+      <p id="error" class="error"></p>
+    </section>
+
+    <section id="game" class="game hidden">
+      <header class="topbar">
+        <div>
+          <div class="brand-kicker">SOM DA SEIS</div>
+          <strong>Duelo 21</strong>
+        </div>
+        <button id="copyCode" class="code-pill">Sala <span id="codeLabel">-----</span></button>
+      </header>
+
+      <section class="status-panel">
+        <span id="statusText">Aguardando...</span>
+      </section>
+
+      <section id="players" class="players"></section>
+
+      <section class="tri-box">
+        <div class="section-title">Seus triunfos</div>
+        <div id="triumphs" class="triumph-list"></div>
+      </section>
+
+      <section class="actions">
+        <button id="hitBtn" class="primary action-btn">Comprar carta</button>
+        <button id="standBtn" class="action-btn">Parar</button>
+        <button id="restartBtn" class="action-btn hidden">Nova partida</button>
+      </section>
+
+      <div id="peekToast" class="toast hidden"></div>
+    </section>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
