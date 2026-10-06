@@ -1,0 +1,16 @@
+{
+  "name": "som-da-seis-21",
+  "version": "1.0.0",
+  "description": "Protótipo multiplayer de 21 para RPG Som da Seis",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
