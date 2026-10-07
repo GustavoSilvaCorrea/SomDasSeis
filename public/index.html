@@ -2,61 +2,382 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  />
+
+  <meta
+    name="theme-color"
+    content="#160d08"
+  />
+
   <title>Som da Seis • Duelo 21</title>
-  <link rel="stylesheet" href="style.css" />
+
+  <link
+    rel="preconnect"
+    href="https://fonts.googleapis.com"
+  >
+
+  <link
+    rel="preconnect"
+    href="https://fonts.gstatic.com"
+    crossorigin
+  >
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=Rye&family=Special+Elite&display=swap"
+    rel="stylesheet"
+  >
+
+  <link
+    rel="stylesheet"
+    href="style.css"
+  />
 </head>
+
 <body>
+
+  <div class="grain"></div>
+  <div class="vignette"></div>
+
   <main class="app-shell">
-    <section id="lobby" class="panel lobby">
-      <div class="brand-kicker">SOM DA SEIS</div>
-      <h1>Duelo 21</h1>
-      <p class="sub">Entre numa mesa, enfrente outro jogador e use triunfos para quebrar as regras.</p>
 
-      <label>Seu nome</label>
-      <input id="name" maxlength="20" placeholder="Ex.: Gustavo" />
+    <!-- ========================================= -->
+    <!-- LOBBY -->
+    <!-- ========================================= -->
 
-      <div class="lobby-actions">
-        <button id="createBtn" class="primary">Criar sala</button>
-        <div class="join-box">
-          <input id="roomCode" maxlength="5" placeholder="CÓDIGO" />
-          <button id="joinBtn">Entrar</button>
+    <section
+      id="lobby"
+      class="lobby-screen"
+    >
+
+      <div class="wanted-board">
+
+        <div class="western-ornament">
+          ✦
         </div>
+
+        <p class="brand-kicker">
+          SOM DA SEIS
+        </p>
+
+        <h1>
+          DUELO
+          <span>21</span>
+        </h1>
+
+        <div class="divider">
+          <span></span>
+          <b>♠</b>
+          <span></span>
+        </div>
+
+        <p class="lobby-description">
+          Dois jogadores.
+          Uma mesa.
+          Nenhuma regra é sagrada.
+        </p>
+
+        <div class="player-form">
+
+          <label for="name">
+            Nome do pistoleiro
+          </label>
+
+          <input
+            id="name"
+            maxlength="20"
+            autocomplete="off"
+            placeholder="Digite seu nome"
+          />
+
+        </div>
+
+        <div class="lobby-actions">
+
+          <button
+            id="createBtn"
+            class="western-button primary large"
+          >
+            <span class="button-icon">
+              ✦
+            </span>
+
+            CRIAR MESA
+          </button>
+
+          <div class="join-separator">
+            <span></span>
+            <b>OU</b>
+            <span></span>
+          </div>
+
+          <div class="join-area">
+
+            <input
+              id="roomCode"
+              maxlength="5"
+              autocomplete="off"
+              placeholder="CÓDIGO"
+            />
+
+            <button
+              id="joinBtn"
+              class="western-button"
+            >
+              ENTRAR
+            </button>
+
+          </div>
+
+        </div>
+
+        <p
+          id="error"
+          class="error"
+        ></p>
+
+        <div class="board-footer">
+          <span>♣</span>
+          <span>♦</span>
+          <span>♥</span>
+          <span>♠</span>
+        </div>
+
       </div>
-      <p id="error" class="error"></p>
+
     </section>
 
-    <section id="game" class="game hidden">
-      <header class="topbar">
-        <div>
-          <div class="brand-kicker">SOM DA SEIS</div>
-          <strong>Duelo 21</strong>
+
+    <!-- ========================================= -->
+    <!-- GAME -->
+    <!-- ========================================= -->
+
+    <section
+      id="game"
+      class="game hidden"
+    >
+
+      <!-- TOP BAR -->
+
+      <header class="game-header">
+
+        <div class="game-logo">
+
+          <span class="small-title">
+            SOM DA SEIS
+          </span>
+
+          <strong>
+            DUELO 21
+          </strong>
+
         </div>
-        <button id="copyCode" class="code-pill">Sala <span id="codeLabel">-----</span></button>
+
+        <button
+          id="copyCode"
+          class="room-code"
+        >
+          <small>
+            MESA
+          </small>
+
+          <span id="codeLabel">
+            -----
+          </span>
+        </button>
+
       </header>
 
-      <section class="status-panel">
-        <span id="statusText">Aguardando...</span>
+
+      <!-- STATUS -->
+
+      <section class="status-wrapper">
+
+        <div class="status-decoration">
+          ✦
+        </div>
+
+        <div
+          id="statusText"
+          class="status-text"
+        >
+          Aguardando...
+        </div>
+
+        <div class="status-decoration">
+          ✦
+        </div>
+
       </section>
 
-      <section id="players" class="players"></section>
 
-      <section class="tri-box">
-        <div class="section-title">Seus triunfos</div>
-        <div id="triumphs" class="triumph-list"></div>
+      <!-- TABLE -->
+
+      <section class="table-area">
+
+        <div class="table-edge table-edge-top"></div>
+
+        <div class="table-surface">
+
+          <div class="table-mark table-mark-left">
+            ♠
+          </div>
+
+          <div class="table-mark table-mark-right">
+            ♦
+          </div>
+
+          <div
+            id="players"
+            class="players"
+          ></div>
+
+          <div class="table-center-mark">
+
+            <span>
+              SDS
+            </span>
+
+            <small>
+              XXI
+            </small>
+
+          </div>
+
+        </div>
+
+        <div class="table-edge table-edge-bottom"></div>
+
       </section>
 
-      <section class="actions">
-        <button id="hitBtn" class="primary action-btn">Comprar carta</button>
-        <button id="standBtn" class="action-btn">Parar</button>
-        <button id="restartBtn" class="action-btn hidden">Nova partida</button>
+
+      <!-- TRIUNFOS -->
+
+      <section class="triumph-section">
+
+        <div class="section-heading">
+
+          <span class="heading-line"></span>
+
+          <div>
+
+            <small>
+              CARTAS NA MANGA
+            </small>
+
+            <h2>
+              TRIUNFOS
+            </h2>
+
+          </div>
+
+          <span class="heading-line"></span>
+
+        </div>
+
+        <div
+          id="triumphs"
+          class="triumph-list"
+        ></div>
+
       </section>
 
-      <div id="peekToast" class="toast hidden"></div>
+
+      <!-- ACTIONS -->
+
+      <section class="game-actions">
+
+        <button
+          id="hitBtn"
+          class="action-button hit-button"
+        >
+
+          <span class="action-symbol">
+            ♠
+          </span>
+
+          <span class="action-text">
+
+            <small>
+              ARRISQUE
+            </small>
+
+            <strong>
+              COMPRAR CARTA
+            </strong>
+
+          </span>
+
+        </button>
+
+
+        <button
+          id="standBtn"
+          class="action-button stand-button"
+        >
+
+          <span class="action-symbol">
+            ✋
+          </span>
+
+          <span class="action-text">
+
+            <small>
+              JÁ BASTA
+            </small>
+
+            <strong>
+              PARAR
+            </strong>
+
+          </span>
+
+        </button>
+
+
+        <button
+          id="restartBtn"
+          class="action-button restart-button hidden"
+        >
+
+          <span class="action-symbol">
+            ↻
+          </span>
+
+          <span class="action-text">
+
+            <small>
+              OUTRA RODADA
+            </small>
+
+            <strong>
+              NOVO DUELO
+            </strong>
+
+          </span>
+
+        </button>
+
+      </section>
+
+
+      <!-- TOAST -->
+
+      <div
+        id="peekToast"
+        class="toast hidden"
+      ></div>
+
     </section>
+
   </main>
+
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="app.js"></script>
+
 </body>
 </html>
