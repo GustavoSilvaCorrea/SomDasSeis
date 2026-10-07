@@ -2,382 +2,113 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8" />
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, viewport-fit=cover"
-  />
-
-  <meta
-    name="theme-color"
-    content="#160d08"
-  />
-
-  <title>Som da Seis • Duelo 21</title>
-
-  <link
-    rel="preconnect"
-    href="https://fonts.googleapis.com"
-  >
-
-  <link
-    rel="preconnect"
-    href="https://fonts.gstatic.com"
-    crossorigin
-  >
-
-  <link
-    href="https://fonts.googleapis.com/css2?family=Rye&family=Special+Elite&display=swap"
-    rel="stylesheet"
-  >
-
-  <link
-    rel="stylesheet"
-    href="style.css"
-  />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#241409" />
+  <meta name="description" content="Som da Seis — um duelo de 21 em uma mesa de saloon." />
+  <title>Som da Seis · Duelo 21</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Rye&family=Special+Elite&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css?v=5" />
 </head>
-
 <body>
-
-  <div class="grain"></div>
-  <div class="vignette"></div>
+  <div class="film-grain" aria-hidden="true"></div>
 
   <main class="app-shell">
-
-    <!-- ========================================= -->
-    <!-- LOBBY -->
-    <!-- ========================================= -->
-
-    <section
-      id="lobby"
-      class="lobby-screen"
-    >
-
+    <!-- A tela de entrada continua sendo um anúncio/cartaz de saloon. -->
+    <section id="lobby" class="lobby-screen">
       <div class="wanted-board">
+        <p class="western-ornament">✦ &nbsp; 1887 &nbsp; ✦</p>
+        <p class="brand-kicker">SOM DA SEIS APRESENTA</p>
+        <h1>DUELO <span>21</span></h1>
+        <div class="poster-divider" aria-hidden="true"><span></span> ♠ <span></span></div>
+        <p class="lobby-description">Uma mesa. Dois pistoleiros.<br />A sorte decide quem sai de pé.</p>
 
-        <div class="western-ornament">
-          ✦
+        <label for="name">Como te chamam por essas bandas?</label>
+        <input id="name" maxlength="20" autocomplete="nickname" placeholder="Seu nome" />
+
+        <button id="createBtn" class="western-button create-button" type="button">✦ &nbsp; CRIAR MESA</button>
+        <p class="or-label">───── &nbsp; OU &nbsp; ─────</p>
+        <div class="join-area">
+          <input id="roomCode" maxlength="5" autocomplete="off" autocapitalize="characters" placeholder="CÓDIGO" aria-label="Código da sala" />
+          <button id="joinBtn" class="western-button" type="button">ENTRAR</button>
         </div>
-
-        <p class="brand-kicker">
-          SOM DA SEIS
-        </p>
-
-        <h1>
-          DUELO
-          <span>21</span>
-        </h1>
-
-        <div class="divider">
-          <span></span>
-          <b>♠</b>
-          <span></span>
-        </div>
-
-        <p class="lobby-description">
-          Dois jogadores.
-          Uma mesa.
-          Nenhuma regra é sagrada.
-        </p>
-
-        <div class="player-form">
-
-          <label for="name">
-            Nome do pistoleiro
-          </label>
-
-          <input
-            id="name"
-            maxlength="20"
-            autocomplete="off"
-            placeholder="Digite seu nome"
-          />
-
-        </div>
-
-        <div class="lobby-actions">
-
-          <button
-            id="createBtn"
-            class="western-button primary large"
-          >
-            <span class="button-icon">
-              ✦
-            </span>
-
-            CRIAR MESA
-          </button>
-
-          <div class="join-separator">
-            <span></span>
-            <b>OU</b>
-            <span></span>
-          </div>
-
-          <div class="join-area">
-
-            <input
-              id="roomCode"
-              maxlength="5"
-              autocomplete="off"
-              placeholder="CÓDIGO"
-            />
-
-            <button
-              id="joinBtn"
-              class="western-button"
-            >
-              ENTRAR
-            </button>
-
-          </div>
-
-        </div>
-
-        <p
-          id="error"
-          class="error"
-        ></p>
-
-        <div class="board-footer">
-          <span>♣</span>
-          <span>♦</span>
-          <span>♥</span>
-          <span>♠</span>
-        </div>
-
+        <p id="error" class="error" role="alert"></p>
+        <p class="poster-footer">♣ &nbsp; ♦ &nbsp; ♥ &nbsp; ♠</p>
       </div>
-
     </section>
 
-
-    <!-- ========================================= -->
-    <!-- GAME -->
-    <!-- ========================================= -->
-
-    <section
-      id="game"
-      class="game hidden"
-    >
-
-      <!-- TOP BAR -->
-
+    <!-- Mesa: as mãos são renderizadas diretamente no feltro. -->
+    <section id="game" class="game hidden" aria-label="Duelo de 21">
       <header class="game-header">
-
-        <div class="game-logo">
-
-          <span class="small-title">
-            SOM DA SEIS
-          </span>
-
-          <strong>
-            DUELO 21
-          </strong>
-
+        <div class="game-brand">
+          <small>SOM DA SEIS</small>
+          <strong>DUELO <em>21</em></strong>
         </div>
-
-        <button
-          id="copyCode"
-          class="room-code"
-        >
-          <small>
-            MESA
-          </small>
-
-          <span id="codeLabel">
-            -----
-          </span>
-        </button>
-
+        <div class="header-controls">
+          <button id="soundToggle" class="sound-toggle" type="button" aria-pressed="true" aria-label="Silenciar sons">♪ <span>Som ligado</span></button>
+          <button id="copyCode" class="room-code" type="button" title="Copiar código da mesa">
+            <small>MESA</small><span id="codeLabel">-----</span>
+          </button>
+        </div>
       </header>
 
+      <section class="table-area" aria-label="Mesa de cartas">
+        <div class="table-rim">
+          <div class="table-felt">
+            <div class="table-stitch" aria-hidden="true"></div>
+            <span class="corner-flourish corner-flourish--tl" aria-hidden="true">❧</span>
+            <span class="corner-flourish corner-flourish--br" aria-hidden="true">❧</span>
 
-      <!-- STATUS -->
+            <!-- Pequenas plaquinhas e cartas no feltro, sem containers de jogadores. -->
+            <div id="players" class="players" aria-live="polite"></div>
 
-      <section class="status-wrapper">
+            <div class="table-middle">
+              <div class="table-emblem" aria-hidden="true"><span>S</span><small>21</small><span>S</span></div>
+              <button id="drawDeck" class="deck-pile" type="button" disabled aria-label="Comprar uma carta do baralho" title="Comprar carta">
+                <span class="deck-back"></span>
+                <span class="deck-back"></span>
+                <span class="deck-back"><span class="deck-rose">✦</span></span>
+                <small id="deckHint">AGUARDE SUA VEZ</small>
+              </button>
+            </div>
 
-        <div class="status-decoration">
-          ✦
+            <div class="coin-tray" aria-label="Moedas de triunfos">
+              <div id="triumphs" class="coin-list"></div>
+              <span class="coin-tray-caption">SEUS TRIUNFOS</span>
+            </div>
+          </div>
         </div>
-
-        <div
-          id="statusText"
-          class="status-text"
-        >
-          Aguardando...
-        </div>
-
-        <div class="status-decoration">
-          ✦
-        </div>
-
+        <div class="table-bottom-rail" aria-hidden="true"><span>✦</span><span> SALOON · SOM DA SEIS · 1887 </span><span>✦</span></div>
       </section>
 
+      <div class="status-strip" role="status" aria-live="polite">
+        <span class="status-star" aria-hidden="true">✦</span>
+        <span id="statusText">Aguardando...</span>
+        <span class="status-star" aria-hidden="true">✦</span>
+      </div>
 
-      <!-- TABLE -->
+      <section class="game-actions" aria-label="Ações do turno">
+        <button id="standBtn" class="action-button action-stand" type="button"><span class="action-symbol">✕</span><span><small>FICAR COM A MÃO</small><strong>PARAR</strong></span></button>
+        <button id="restartBtn" class="action-button action-restart hidden" type="button"><span class="action-symbol">↻</span><span><small>MAIS UMA CHANCE</small><strong>NOVA PARTIDA</strong></span></button>
+      </section>
 
-      <section class="table-area">
+      <div id="peekToast" class="toast hidden" role="status"></div>
 
-        <div class="table-edge table-edge-top"></div>
-
-        <div class="table-surface">
-
-          <div class="table-mark table-mark-left">
-            ♠
-          </div>
-
-          <div class="table-mark table-mark-right">
-            ♦
-          </div>
-
-          <div
-            id="players"
-            class="players"
-          ></div>
-
-          <div class="table-center-mark">
-
-            <span>
-              SDS
-            </span>
-
-            <small>
-              XXI
-            </small>
-
-          </div>
-
+      <!-- No celular, tocar na moeda abre os detalhes antes de usar. -->
+      <dialog id="triumphDialog" class="triumph-dialog" aria-labelledby="triumphTitle">
+        <div class="dialog-coin" aria-hidden="true">✦</div>
+        <p class="dialog-kicker">TRIUNFO</p>
+        <h2 id="triumphTitle"></h2>
+        <p id="triumphDescription"></p>
+        <div class="dialog-actions">
+          <button id="closeTriumph" type="button">FECHAR</button>
+          <button id="useTriumph" type="button">USAR MOEDA</button>
         </div>
-
-        <div class="table-edge table-edge-bottom"></div>
-
-      </section>
-
-
-      <!-- TRIUNFOS -->
-
-      <section class="triumph-section">
-
-        <div class="section-heading">
-
-          <span class="heading-line"></span>
-
-          <div>
-
-            <small>
-              CARTAS NA MANGA
-            </small>
-
-            <h2>
-              TRIUNFOS
-            </h2>
-
-          </div>
-
-          <span class="heading-line"></span>
-
-        </div>
-
-        <div
-          id="triumphs"
-          class="triumph-list"
-        ></div>
-
-      </section>
-
-
-      <!-- ACTIONS -->
-
-      <section class="game-actions">
-
-        <button
-          id="hitBtn"
-          class="action-button hit-button"
-        >
-
-          <span class="action-symbol">
-            ♠
-          </span>
-
-          <span class="action-text">
-
-            <small>
-              ARRISQUE
-            </small>
-
-            <strong>
-              COMPRAR CARTA
-            </strong>
-
-          </span>
-
-        </button>
-
-
-        <button
-          id="standBtn"
-          class="action-button stand-button"
-        >
-
-          <span class="action-symbol">
-            ✋
-          </span>
-
-          <span class="action-text">
-
-            <small>
-              JÁ BASTA
-            </small>
-
-            <strong>
-              PARAR
-            </strong>
-
-          </span>
-
-        </button>
-
-
-        <button
-          id="restartBtn"
-          class="action-button restart-button hidden"
-        >
-
-          <span class="action-symbol">
-            ↻
-          </span>
-
-          <span class="action-text">
-
-            <small>
-              OUTRA RODADA
-            </small>
-
-            <strong>
-              NOVO DUELO
-            </strong>
-
-          </span>
-
-        </button>
-
-      </section>
-
-
-      <!-- TOAST -->
-
-      <div
-        id="peekToast"
-        class="toast hidden"
-      ></div>
-
+      </dialog>
     </section>
-
   </main>
-
-
   <script src="/socket.io/socket.io.js"></script>
-  <script src="app.js"></script>
-
+  <script src="/app.js?v=5"></script>
 </body>
 </html>

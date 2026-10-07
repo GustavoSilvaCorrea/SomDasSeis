@@ -1,668 +1,440 @@
-// public/app.js
-
+/*
+ * SOM DA SEIS · DUELO 21
+ * Só interface: o servidor continua decidindo cartas, turnos e triunfos.
+ */
 const socket = io();
+const $ = selector => document.querySelector(selector);
 
-const lobby =
-  document.querySelector(
-    '#lobby'
-  );
+const lobby = $('#lobby');
+const game = $('#game');
+const nameInput = $('#name');
+const codeInput = $('#roomCode');
+const createBtn = $('#createBtn');
+const joinBtn = $('#joinBtn');
+const errorBox = $('#error');
+const codeLabel = $('#codeLabel');
+const copyCode = $('#copyCode');
+const soundToggle = $('#soundToggle');
+const statusText = $('#statusText');
+const playersEl = $('#players');
+const triumphsEl = $('#triumphs');
+const drawDeck = $('#drawDeck');
+const deckHint = $('#deckHint');
+const standBtn = $('#standBtn');
+const restartBtn = $('#restartBtn');
+const peekToast = $('#peekToast');
+const triumphDialog = $('#triumphDialog');
+const triumphTitle = $('#triumphTitle');
+const triumphDescription = $('#triumphDescription');
+const useTriumphBtn = $('#useTriumph');
+const closeTriumphBtn = $('#closeTriumph');
 
-const game =
-  document.querySelector(
-    '#game'
-  );
-
-const nameInput =
-  document.querySelector(
-    '#name'
-  );
-
-const codeInput =
-  document.querySelector(
-    '#roomCode'
-  );
-
-const createBtn =
-  document.querySelector(
-    '#createBtn'
-  );
-
-const joinBtn =
-  document.querySelector(
-    '#joinBtn'
-  );
-
-const errorBox =
-  document.querySelector(
-    '#error'
-  );
-
-const codeLabel =
-  document.querySelector(
-    '#codeLabel'
-  );
-
-const copyCode =
-  document.querySelector(
-    '#copyCode'
-  );
-
-const statusText =
-  document.querySelector(
-    '#statusText'
-  );
-
-const playersEl =
-  document.querySelector(
-    '#players'
-  );
-
-const triumphsEl =
-  document.querySelector(
-    '#triumphs'
-  );
-
-const hitBtn =
-  document.querySelector(
-    '#hitBtn'
-  );
-
-const standBtn =
-  document.querySelector(
-    '#standBtn'
-  );
-
-const restartBtn =
-  document.querySelector(
-    '#restartBtn'
-  );
-
-const peekToast =
-  document.querySelector(
-    '#peekToast'
-  );
-
-const PLAYER_ID_KEY =
-  'somDaSeis21.playerId';
-
-const ROOM_CODE_KEY =
-  'somDaSeis21.roomCode';
-
-const PLAYER_NAME_KEY =
-  'somDaSeis21.playerName';
+const PLAYER_ID_KEY = 'somDaSeis21.playerId';
+const ROOM_CODE_KEY = 'somDaSeis21.roomCode';
+const PLAYER_NAME_KEY = 'somDaSeis21.playerName';
+const SOUND_KEY = 'somDaSeis21.soundEnabled';
 
 let state = null;
-
-let currentRoomCode =
-  localStorage.getItem(
-    ROOM_CODE_KEY
-  ) || '';
-
-let playerId =
-  localStorage.getItem(
-    PLAYER_ID_KEY
-  );
+let currentRoomCode = localStorage.getItem(ROOM_CODE_KEY) || '';
+let playerId = localStorage.getItem(PLAYER_ID_KEY);
+let soundEnabled = localStorage.getItem(SOUND_KEY) !== 'false';
+let audioContext = null;
+let toastTimer = null;
+let selectedTriumphId = null;
+let flightVersion = 0;
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+const touchInterface = window.matchMedia('(hover: none), (pointer: coarse)');
 
 if (!playerId) {
-  if (
-    typeof crypto !==
-      'undefined' &&
-    crypto.randomUUID
-  ) {
-    playerId =
-      crypto.randomUUID();
-  } else {
-    playerId =
-      `player-${Date.now()}-${Math.random()
-        .toString(36)
-        .slice(2)}`;
-  }
+  playerId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : `player-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  localStorage.setItem(PLAYER_ID_KEY, playerId);
+}
+nameInput.value = localStorage.getItem(PLAYER_NAME_KEY) || '';
+updateSoundToggle();
 
-  localStorage.setItem(
-    PLAYER_ID_KEY,
-    playerId
-  );
+/* Sons sintetizados localmente; nenhum arquivo de áudio é necessário. */
+function unlockAudio() {
+  if (!soundEnabled) return null;
+  try {
+    if (!audioContext) {
+      const Audio = window.AudioContext || window.webkitAudioContext;
+      if (!Audio) return null;
+      audioContext = new Audio();
+    }
+    if (audioContext.state === 'suspended') audioContext.resume().catch(() => {});
+    return audioContext;
+  } catch (_) { return null; }
 }
 
-const savedName =
-  localStorage.getItem(
-    PLAYER_NAME_KEY
-  );
+function playCardSound() {
+  const ctx = audioContext;
+  if (!soundEnabled || !ctx || ctx.state !== 'running' || document.hidden) return;
+  const now = ctx.currentTime;
+  const length = Math.floor(ctx.sampleRate * .15);
+  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+  const samples = buffer.getChannelData(0);
+  for (let i = 0; i < length; i++) {
+    const progress = i / length;
+    samples[i] = (Math.random() * 2 - 1) * Math.pow(1 - progress, 1.5);
+  }
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.setValueAtTime(1900, now);
+  filter.frequency.exponentialRampToValueAtTime(850, now + .13);
+  filter.Q.value = .66;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(.0001, now);
+  gain.gain.exponentialRampToValueAtTime(.19, now + .012);
+  gain.gain.exponentialRampToValueAtTime(.0001, now + .14);
+  source.connect(filter).connect(gain).connect(ctx.destination);
+  source.start(now);
+  source.stop(now + .15);
 
-if (savedName) {
-  nameInput.value =
-    savedName;
+  const thud = ctx.createOscillator();
+  const thudGain = ctx.createGain();
+  thud.type = 'triangle';
+  thud.frequency.setValueAtTime(210, now + .065);
+  thud.frequency.exponentialRampToValueAtTime(95, now + .12);
+  thudGain.gain.setValueAtTime(.0001, now + .065);
+  thudGain.gain.exponentialRampToValueAtTime(.07, now + .075);
+  thudGain.gain.exponentialRampToValueAtTime(.0001, now + .14);
+  thud.connect(thudGain).connect(ctx.destination);
+  thud.start(now + .065);
+  thud.stop(now + .145);
 }
 
-createBtn.addEventListener(
-  'click',
-  () => {
-    rememberName();
+function playCoinSound() {
+  const ctx = audioContext;
+  if (!soundEnabled || !ctx || ctx.state !== 'running' || document.hidden) return;
+  const now = ctx.currentTime;
+  // Três frequências não harmônicas criam o som de uma moeda metálica.
+  [910, 1468, 2214].forEach((frequency, index) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = index === 0 ? 'triangle' : 'sine';
+    osc.frequency.setValueAtTime(frequency, now);
+    osc.frequency.exponentialRampToValueAtTime(frequency * .985, now + .28);
+    const volume = [.09, .056, .028][index];
+    gain.gain.setValueAtTime(.0001, now);
+    gain.gain.exponentialRampToValueAtTime(volume, now + .006);
+    gain.gain.exponentialRampToValueAtTime(.0001, now + [.38, .28, .19][index]);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + .42);
+  });
+  const click = ctx.createOscillator();
+  const clickGain = ctx.createGain();
+  click.type = 'triangle';
+  click.frequency.setValueAtTime(510, now);
+  click.frequency.exponentialRampToValueAtTime(195, now + .046);
+  clickGain.gain.setValueAtTime(.06, now);
+  clickGain.gain.exponentialRampToValueAtTime(.0001, now + .05);
+  click.connect(clickGain).connect(ctx.destination);
+  click.start(now);
+  click.stop(now + .052);
+}
 
-    errorBox.textContent =
-      '';
-
-    socket.emit(
-      'createRoom',
-      {
-        name:
-          playerName(),
-
-        playerId
-      }
-    );
-  }
-);
-
-joinBtn.addEventListener(
-  'click',
-  () => {
-    rememberName();
-
-    errorBox.textContent =
-      '';
-
-    socket.emit(
-      'joinRoom',
-      {
-        code:
-          codeInput.value,
-
-        name:
-          playerName(),
-
-        playerId
-      }
-    );
-  }
-);
-
-hitBtn.addEventListener(
-  'click',
-  () => {
-    socket.emit('hit');
-  }
-);
-
-standBtn.addEventListener(
-  'click',
-  () => {
-    socket.emit('stand');
-  }
-);
-
-restartBtn.addEventListener(
-  'click',
-  () => {
-    socket.emit(
-      'restart'
-    );
-  }
-);
-
-codeInput.addEventListener(
-  'input',
-  () => {
-    codeInput.value =
-      codeInput.value
-        .toUpperCase()
-        .replace(
-          /[^A-Z0-9]/g,
-          ''
-        )
-        .slice(
-          0,
-          5
-        );
-  }
-);
-
-copyCode.addEventListener(
-  'click',
-  async () => {
-    if (
-      !state?.code
-    ) {
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(
-        state.code
-      );
-
-      showToast(
-        `Código ${state.code} copiado.`
-      );
-    } catch {
-      showToast(
-        `Código da sala: ${state.code}`
-      );
-    }
-  }
-);
-
-socket.on(
-  'connect',
-  () => {
-    if (
-      currentRoomCode
-    ) {
-      socket.emit(
-        'reconnectRoom',
-        {
-          code:
-            currentRoomCode,
-
-          playerId,
-
-          name:
-            playerName()
-        }
-      );
-    }
-  }
-);
-
-socket.on(
-  'disconnect',
-  () => {
-    hitBtn.disabled =
-      true;
-
-    standBtn.disabled =
-      true;
-
-    if (state) {
-      statusText.textContent =
-        'Conexão perdida. Reconectando...';
-    }
-  }
-);
-
-socket.on(
-  'roomError',
-  payload => {
-    const message =
-      typeof payload ===
-      'string'
-        ? payload
-        : payload?.message;
-
-    errorBox.textContent =
-      message ||
-      'Não foi possível entrar na sala.';
-
-    if (
-      payload?.forgetRoom
-    ) {
-      currentRoomCode =
-        '';
-
-      localStorage.removeItem(
-        ROOM_CODE_KEY
-      );
-
-      state =
-        null;
-
-      game.classList.add(
-        'hidden'
-      );
-
-      lobby.classList.remove(
-        'hidden'
-      );
-    }
-  }
-);
-
-socket.on(
-  'errorMessage',
-  message => {
-    errorBox.textContent =
-      message;
-  }
-);
-
-socket.on(
-  'peekResult',
-  card => {
-    if (!card) {
-      return;
-    }
-
-    showToast(
-      `A próxima carta é ${card.rank}${card.suit}`
-    );
-  }
-);
-
-socket.on(
-  'state',
-  next => {
-    state =
-      next;
-
-    currentRoomCode =
-      next.code;
-
-    localStorage.setItem(
-      ROOM_CODE_KEY,
-      next.code
-    );
-
-    lobby.classList.add(
-      'hidden'
-    );
-
-    game.classList.remove(
-      'hidden'
-    );
-
-    render();
-  }
-);
+function updateSoundToggle() {
+  soundToggle.classList.toggle('is-muted', !soundEnabled);
+  soundToggle.setAttribute('aria-pressed', String(soundEnabled));
+  soundToggle.setAttribute('aria-label', soundEnabled ? 'Silenciar sons' : 'Ativar sons');
+  soundToggle.innerHTML = soundEnabled
+    ? '<span aria-hidden="true">♫</span> <span>Som ligado</span>'
+    : '<span aria-hidden="true">♪</span> <span>Som desligado</span>';
+}
+soundToggle.addEventListener('click', () => {
+  soundEnabled = !soundEnabled;
+  localStorage.setItem(SOUND_KEY, String(soundEnabled));
+  updateSoundToggle();
+  if (soundEnabled) { unlockAudio(); playCoinSound(); }
+});
 
 function playerName() {
-  return (
-    nameInput.value.trim() ||
-    localStorage.getItem(
-      PLAYER_NAME_KEY
-    ) ||
-    'Jogador'
-  );
+  return nameInput.value.trim() || localStorage.getItem(PLAYER_NAME_KEY) || 'Jogador';
 }
+function rememberName() { localStorage.setItem(PLAYER_NAME_KEY, playerName()); }
+createBtn.addEventListener('click', () => {
+  unlockAudio(); rememberName(); errorBox.textContent = '';
+  socket.emit('createRoom', { name: playerName(), playerId });
+});
+joinBtn.addEventListener('click', () => {
+  unlockAudio(); rememberName(); errorBox.textContent = '';
+  socket.emit('joinRoom', { code: codeInput.value, name: playerName(), playerId });
+});
+codeInput.addEventListener('input', () => {
+  codeInput.value = codeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5);
+});
+drawDeck.addEventListener('click', () => {
+  if (!canAct()) return;
+  unlockAudio();
+  socket.emit('hit');
+});
+standBtn.addEventListener('click', () => {
+  if (!canAct()) return;
+  unlockAudio(); socket.emit('stand');
+});
+restartBtn.addEventListener('click', () => {
+  unlockAudio(); socket.emit('restart');
+});
+copyCode.addEventListener('click', async () => {
+  if (!state?.code) return;
+  try {
+    await navigator.clipboard.writeText(state.code);
+    showToast(`Código ${state.code} copiado!`);
+  } catch (_) { showToast(`Código da mesa: ${state.code}`); }
+});
 
-function rememberName() {
-  localStorage.setItem(
-    PLAYER_NAME_KEY,
-    playerName()
-  );
-}
-
-function render() {
-  if (!state) {
-    return;
+socket.on('connect', () => {
+  if (currentRoomCode) socket.emit('reconnectRoom', { code: currentRoomCode, playerId, name: playerName() });
+});
+socket.on('disconnect', () => {
+  drawDeck.disabled = true;
+  standBtn.disabled = true;
+  if (state) statusText.textContent = 'Conexão perdida. Reconectando à mesa...';
+});
+socket.on('roomError', payload => {
+  const message = typeof payload === 'string' ? payload : payload?.message;
+  errorBox.textContent = message || 'Não foi possível entrar nessa mesa.';
+  if (state) showToast(errorBox.textContent);
+  if (payload?.forgetRoom) {
+    currentRoomCode = '';
+    localStorage.removeItem(ROOM_CODE_KEY);
+    state = null;
+    game.classList.add('hidden');
+    lobby.classList.remove('hidden');
   }
+});
+socket.on('errorMessage', message => {
+  errorBox.textContent = message;
+  if (state) showToast(message);
+});
+socket.on('peekResult', card => {
+  if (card) showToast(`Instinto: a próxima carta é ${card.rank}${card.suit}`);
+});
 
-  codeLabel.textContent =
-    state.code;
-
-  statusText.textContent =
-    state.message || '';
-
-  playersEl.innerHTML =
-    '';
-
-  state.players.forEach(
-    player => {
-      const card =
-        document.createElement(
-          'article'
-        );
-
-      const isMe =
-        player.id ===
-        playerId;
-
-      const active =
-        state.currentTurn ===
-          player.id &&
-        state.phase ===
-          'playing';
-
-      card.className =
-        `player-card ${isMe ? 'me' : ''} ${active ? 'active' : ''}`;
-
-      card.innerHTML = `
-        <div class="player-head">
-
-          <div>
-
-            <div class="player-name">
-              ${escapeHtml(player.name)}
-              ${isMe ? '(você)' : ''}
-            </div>
-
-            <div class="meta">
-              Limite atual:
-              ${player.target}
-            </div>
-
-          </div>
-
-          <div class="score">
-            ${player.score}
-          </div>
-
-        </div>
-
-        <div class="hand">
-
-          ${player.hand
-            .map(
-              renderCard
-            )
-            .join('')}
-
-        </div>
-
-        ${statusBadge(
-          player,
-          active
-        )}
-      `;
-
-      playersEl.appendChild(
-        card
-      );
+/* Detecta as cartas novas, sem duplicar animação ao trocar de turno ou usar um triunfo. */
+function detectNewCards(previous, next) {
+  const result = new Map();
+  const oldById = new Map((previous?.players || []).map(p => [p.id, p]));
+  const newRound = !previous || previous.code !== next.code ||
+    (previous.phase !== 'playing' && next.phase === 'playing');
+  for (const player of next.players) {
+    const oldHand = oldById.get(player.id)?.hand || [];
+    const hand = player.hand || [];
+    const replaced = oldHand.length === hand.length && hand.length > 0 &&
+      hand.some((card, i) => card.rank !== oldHand[i]?.rank || card.suit !== oldHand[i]?.suit);
+    const start = newRound || replaced || hand.length < oldHand.length ? 0 : oldHand.length;
+    const added = new Set();
+    if (next.phase === 'playing' || next.phase === 'finished') {
+      for (let i = start; i < hand.length; i++) added.add(i);
     }
-  );
-
-  const me =
-    state.players.find(
-      player =>
-        player.id ===
-        playerId
-    );
-
-  triumphsEl.innerHTML =
-    '';
-
-  if (me) {
-    me.triumphs.forEach(
-      triumph => {
-        const button =
-          document.createElement(
-            'button'
-          );
-
-        button.className =
-          `triumph ${triumph.used ? 'used' : ''}`;
-
-        button.disabled =
-          triumph.used ||
-          !canAct();
-
-        button.innerHTML = `
-          <strong>
-            ${escapeHtml(
-              triumph.name
-            )}
-          </strong>
-
-          <span>
-            ${escapeHtml(
-              triumph.description
-            )}
-          </span>
-        `;
-
-        button.addEventListener(
-          'click',
-          () => {
-            socket.emit(
-              'useTriumph',
-              {
-                triumphId:
-                  triumph.id
-              }
-            );
-          }
-        );
-
-        triumphsEl.appendChild(
-          button
-        );
-      }
-    );
+    result.set(player.id, added);
   }
-
-  const actionAllowed =
-    canAct();
-
-  hitBtn.disabled =
-    !actionAllowed;
-
-  standBtn.disabled =
-    !actionAllowed;
-
-  restartBtn.classList.toggle(
-    'hidden',
-    state.phase !==
-      'finished'
-  );
-
-  restartBtn.disabled =
-    !state.allConnected ||
-    !socket.connected;
-
-  hitBtn.classList.toggle(
-    'hidden',
-    state.phase ===
-      'finished'
-  );
-
-  standBtn.classList.toggle(
-    'hidden',
-    state.phase ===
-      'finished'
-  );
+  return result;
 }
+
+function detectSpentCoins(previous, next) {
+  if (!previous || previous.code !== next.code) return [];
+  const old = previous.players.find(p => p.id === playerId);
+  const fresh = next.players.find(p => p.id === playerId);
+  if (!old || !fresh) return [];
+  return fresh.triumphs
+    .filter(t => t.used && old.triumphs.some(t0 => t0.id === t.id && !t0.used))
+    .map(t => t.id);
+}
+
+socket.on('state', next => {
+  const freshCards = detectNewCards(state, next);
+  const spentCoins = detectSpentCoins(state, next);
+  const secondChance = Boolean(state && state.message !== next.message &&
+    /Segunda Chance automaticamente/.test(next.message || ''));
+  state = next;
+  currentRoomCode = next.code;
+  localStorage.setItem(ROOM_CODE_KEY, next.code);
+  lobby.classList.add('hidden');
+  game.classList.remove('hidden');
+  render(spentCoins);
+  animateNewCards(freshCards);
+  if (secondChance) playCardSound();
+  if (spentCoins.length) playCoinSound();
+});
 
 function canAct() {
-  return Boolean(
-    state &&
-    socket.connected &&
-    state.allConnected &&
-    state.phase ===
-      'playing' &&
-    state.currentTurn ===
-      playerId
-  );
+  return Boolean(state && socket.connected && state.allConnected &&
+    state.phase === 'playing' && state.currentTurn === playerId);
 }
 
-function statusBadge(
-  player,
-  active
-) {
-  if (
-    !player.connected
-  ) {
-    return `
-      <span class="badge danger">
-        Desconectado
-      </span>
-    `;
-  }
+function render(spentCoins = []) {
+  if (!state) return;
+  codeLabel.textContent = state.code;
+  statusText.textContent = state.message || '';
+  const myself = state.players.find(p => p.id === playerId);
+  const opponent = state.players.find(p => p.id !== playerId);
+  playersEl.innerHTML =
+    renderSeat(opponent || null, 'opponent') +
+    renderSeat(myself || null, 'self');
+  renderCoins(myself, spentCoins);
 
-  if (
-    player.busted
-  ) {
-    return `
-      <span class="badge danger">
-        Estourou
-      </span>
-    `;
-  }
-
-  if (
-    player.stood
-  ) {
-    return `
-      <span class="badge">
-        Parou
-      </span>
-    `;
-  }
-
-  if (active) {
-    return `
-      <span class="badge">
-        Turno atual
-      </span>
-    `;
-  }
-
-  return '';
+  const available = canAct();
+  drawDeck.disabled = !available;
+  drawDeck.classList.toggle('is-active', available);
+  drawDeck.setAttribute('aria-label', available ? 'Comprar carta do baralho' : 'Baralho: aguarde sua vez');
+  deckHint.textContent = available ? 'COMPRAR CARTA' : state.phase === 'finished' ? 'RODADA ENCERRADA' : 'AGUARDE SUA VEZ';
+  standBtn.disabled = !available;
+  standBtn.classList.toggle('hidden', state.phase === 'finished');
+  restartBtn.classList.toggle('hidden', state.phase !== 'finished');
+  restartBtn.disabled = !state.allConnected || !socket.connected;
 }
 
-function renderCard(
-  card
-) {
-  const red =
-    card.suit === '♥' ||
-    card.suit === '♦';
-
-  return `
-    <div class="card ${red ? 'red' : ''}">
-
-      <span>
-        ${card.rank}
-      </span>
-
-      <span class="suit">
-        ${card.suit}
-      </span>
-
-    </div>
-  `;
+function renderSeat(player, position) {
+  const isSelf = position === 'self';
+  const active = player && state.phase === 'playing' && state.currentTurn === player.id;
+  const name = player ? player.name : isSelf ? 'Você' : 'Esperando oponente...';
+  const status = !player ? 'AGUARDANDO' :
+    !player.connected ? 'DESCONECTADO' :
+    player.busted ? 'ESTOUROU' : player.stood ? 'PAROU' :
+    active ? 'SUA VEZ' : state.phase === 'waiting' ? 'AGUARDANDO' :
+    state.phase === 'finished' ? 'FIM DE RODADA' : 'NA MESA';
+  const statusClass = player && (!player.connected || player.busted) ? 'is-danger' : active ? 'is-active' : '';
+  const cards = player?.hand || [];
+  return `<section class="seat seat--${position}${active ? ' seat--active' : ''}${player ? '' : ' seat--empty'}"
+    data-player-id="${escapeHtml(player?.id || '')}" aria-label="${isSelf ? 'Sua mão' : 'Adversário'}: ${escapeHtml(name)}">
+      <div class="seat-label">${isSelf ? 'SUA MÃO' : 'ADVERSÁRIO'}${player ? ` · LIMITE ${player.target}` : ''}</div>
+      <div class="seat-nameplate">
+        <div class="seat-main"><div class="seat-name">${escapeHtml(name)}</div></div>
+        <div class="score-token" title="Pontuação atual">${player ? player.score : '—'}</div>
+      </div>
+      <div class="hand" aria-label="Cartas de ${escapeHtml(name)}">${cards.map((card, index) => renderCard(card, index, cards.length)).join('')}</div>
+      <div class="seat-status ${statusClass}">${status}</div>
+    </section>`;
 }
 
-function showToast(
-  message
-) {
-  peekToast.textContent =
-    message;
-
-  peekToast.classList.remove(
-    'hidden'
-  );
-
-  setTimeout(
-    () => {
-      peekToast.classList.add(
-        'hidden'
-      );
-    },
-    2600
-  );
+function renderCard(card, index, count) {
+  const red = card.suit === '♥' || card.suit === '♦';
+  const relative = index - (count - 1) / 2;
+  const angle = Math.max(-17, Math.min(17, relative * 4.5));
+  const arc = Math.min(17, Math.abs(relative) * 5);
+  return `<div class="card ${red ? 'card--red' : ''}" data-card-index="${index}"
+     style="--angle:${angle}deg;--arc:${arc}px"
+     aria-label="${escapeHtml(card.rank)} de ${suitName(card.suit)}">
+    <span class="card-corner">${escapeHtml(card.rank)}<small>${card.suit}</small></span>
+    <span class="card-pip" aria-hidden="true">${card.suit}</span>
+    <span class="card-corner card-corner--bottom" aria-hidden="true">${escapeHtml(card.rank)}<small>${card.suit}</small></span>
+  </div>`;
 }
 
-function escapeHtml(
-  value
-) {
-  return String(
-    value
-  ).replace(
-    /[&<>'"]/g,
-    char => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      "'": '&#39;',
-      '"': '&quot;'
-    }[char])
-  );
+function suitName(suit) {
+  return ({ '♠': 'espadas', '♣': 'paus', '♥': 'copas', '♦': 'ouros' })[suit] || 'naipe';
+}
+
+const coinSymbols = { target24: '24', drawPeek: '✥', secondChance: '↶' };
+function renderCoins(myself, spentCoins) {
+  triumphsEl.replaceChildren();
+  for (const triumph of myself?.triumphs || []) {
+    const coin = document.createElement('button');
+    coin.type = 'button';
+    coin.className = `triumph-coin${triumph.used ? ' used' : ''}${spentCoins.includes(triumph.id) ? ' freshly-spent' : ''}`;
+    coin.setAttribute('aria-label', `${triumph.name}. ${triumph.description}${triumph.used ? ' Já usado.' : ''}`);
+    coin.setAttribute('aria-disabled', String(triumph.used || !canAct()));
+    coin.innerHTML = `
+      <span class="coin-inner" aria-hidden="true"><span class="coin-mark">${coinSymbols[triumph.id] || '✦'}</span></span>
+      <span class="coin-tooltip" role="tooltip"><strong>${escapeHtml(triumph.name)}</strong><span>${escapeHtml(triumph.description)}</span>${triumph.used ? '<em>JÁ UTILIZADO</em>' : triumph.id === 'secondChance' ? '<em>ATIVA AUTOMATICAMENTE AO ESTOURAR</em>' : '<em>CLIQUE PARA USAR</em>'}</span>`;
+    coin.addEventListener('click', event => {
+      unlockAudio();
+      if (event.pointerType === 'touch' || touchInterface.matches || navigator.maxTouchPoints > 0 || triumph.used || !canAct() || triumph.id === 'secondChance') {
+        showTriumphDetails(triumph);
+      } else {
+        activateTriumph(triumph.id);
+      }
+    });
+    triumphsEl.appendChild(coin);
+  }
+}
+function activateTriumph(id) {
+  const mine = state?.players.find(p => p.id === playerId);
+  const selected = mine?.triumphs.find(t => t.id === id);
+  if (!canAct() || !selected || selected.used) return;
+  unlockAudio();
+  socket.emit('useTriumph', { triumphId: id });
+  if (triumphDialog.open) triumphDialog.close();
+}
+function showTriumphDetails(triumph) {
+  selectedTriumphId = triumph.id;
+  triumphTitle.textContent = triumph.name;
+  triumphDescription.textContent = triumph.description;
+  useTriumphBtn.disabled = triumph.used || !canAct() || triumph.id === 'secondChance';
+  useTriumphBtn.textContent = triumph.used ? 'JÁ UTILIZADO' : triumph.id === 'secondChance' ? 'ATIVA AUTOMATICAMENTE' : !canAct() ? 'AGUARDE SUA VEZ' : 'USAR MOEDA';
+  if (!triumphDialog.open) triumphDialog.showModal();
+}
+useTriumphBtn.addEventListener('click', () => {
+  if (selectedTriumphId) activateTriumph(selectedTriumphId);
+});
+closeTriumphBtn.addEventListener('click', () => triumphDialog.close());
+triumphDialog.addEventListener('click', event => {
+  if (event.target === triumphDialog) triumphDialog.close();
+});
+
+/* Carta fantasma percorre o caminho real: pilha -> lugar na mão. */
+function animateNewCards(freshMap) {
+  const version = ++flightVersion;
+  document.querySelectorAll('.flying-card').forEach(el => el.remove());
+  if (reducedMotion.matches || document.hidden) return;
+  const flights = [];
+  for (const [id, indices] of freshMap) {
+    const seat = [...playersEl.querySelectorAll('.seat')].find(el => el.dataset.playerId === id);
+    if (!seat) continue;
+    for (const index of indices) {
+      const card = [...seat.querySelectorAll('.card')].find(el => Number(el.dataset.cardIndex) === index);
+      if (card) { card.classList.add('card-awaiting'); flights.push(card); }
+    }
+  }
+  if (!flights.length) return;
+  const stagger = flights.length > 3 ? 105 : 135;
+  flights.forEach((card, index) => {
+    setTimeout(() => {
+      if (version !== flightVersion || !card.isConnected) return;
+      const origin = drawDeck.getBoundingClientRect();
+      const target = card.getBoundingClientRect();
+      if (!origin.width || !target.width) { card.classList.remove('card-awaiting'); return; }
+      const width = card.offsetWidth;
+      const height = card.offsetHeight;
+      const startX = origin.left + origin.width / 2 - width / 2;
+      const startY = origin.top + origin.height / 2 - height / 2;
+      const endX = target.left + target.width / 2 - width / 2;
+      const endY = target.top + target.height / 2 - height / 2;
+      const dx = endX - startX;
+      const dy = endY - startY;
+      const ghost = card.cloneNode(true);
+      ghost.classList.remove('card-awaiting');
+      ghost.classList.add('flying-card');
+      ghost.style.left = `${startX}px`;
+      ghost.style.top = `${startY}px`;
+      ghost.style.width = `${width}px`;
+      ghost.style.height = `${height}px`;
+      document.body.appendChild(ghost);
+      const anim = ghost.animate([
+        { transform: 'translate3d(0,0,0) rotate(-10deg) scale(.86)', opacity: .75 },
+        { offset: .55, transform: `translate3d(${dx * .55}px,${dy * .55 - 32}px,0) rotate(2deg) scale(1.07)`, opacity: 1 },
+        { transform: `translate3d(${dx}px,${dy}px,0) rotate(${card.style.getPropertyValue('--angle') || '0deg'}) scale(1)`, opacity: 1 }
+      ], { duration: 480, easing: 'cubic-bezier(.22,.62,.12,1)', fill: 'forwards' });
+      playCardSound();
+      const finish = () => { ghost.remove(); card.classList.remove('card-awaiting'); };
+      anim.onfinish = finish;
+      anim.oncancel = finish;
+    }, index * stagger);
+  });
+}
+
+function showToast(message) {
+  peekToast.textContent = message;
+  peekToast.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => peekToast.classList.add('hidden'), 3000);
+}
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 }
