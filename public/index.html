@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Rye&family=Special+Elite&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/style.css?v=5" />
+  <link rel="stylesheet" href="/style.css?v=6" />
 </head>
 <body>
   <div class="film-grain" aria-hidden="true"></div>
@@ -53,6 +53,29 @@
         </div>
       </header>
 
+      <!-- Diário da partida: cada lado registra o último acontecimento daquele jogador. -->
+      <section class="news-wrapper" aria-label="Jornal de acontecimentos da mesa">
+        <header class="news-header">
+          <span class="news-edition">EDIÇÃO EXTRA · 1887</span>
+          <h2>SOM DA SEIS GAZETTE</h2>
+          <span id="statusText" class="news-status" role="status" aria-live="polite">Aguardando...</span>
+        </header>
+        <div class="news-grid">
+          <article class="news-column news-column--mine" aria-label="Suas ações">
+            <span class="news-byline">DA SUA PARTE DA MESA</span>
+            <h3 id="myNewsTitle" class="news-title" aria-live="polite">AGUARDANDO JOGADA</h3>
+            <p id="myNewsBody" class="news-copy">Suas ações vão ganhar manchetes aqui.</p>
+          </article>
+          <div class="news-gutter" aria-hidden="true"><span>EXTRA</span></div>
+          <article class="news-column news-column--opponent" aria-label="Ações do adversário">
+            <span class="news-byline">DO OUTRO LADO DA MESA</span>
+            <h3 id="enemyNewsTitle" class="news-title" aria-live="polite">AGUARDANDO JOGADA</h3>
+            <p id="enemyNewsBody" class="news-copy">As ações do adversário vão aparecer aqui.</p>
+          </article>
+        </div>
+        <footer class="news-footer"><span>♠</span> AS ÚLTIMAS DA MESA <span>♠</span></footer>
+      </section>
+
       <section class="table-area" aria-label="Mesa de cartas">
         <div class="table-rim">
           <div class="table-felt">
@@ -82,11 +105,7 @@
         <div class="table-bottom-rail" aria-hidden="true"><span>✦</span><span> SALOON · SOM DA SEIS · 1887 </span><span>✦</span></div>
       </section>
 
-      <div class="status-strip" role="status" aria-live="polite">
-        <span class="status-star" aria-hidden="true">✦</span>
-        <span id="statusText">Aguardando...</span>
-        <span class="status-star" aria-hidden="true">✦</span>
-      </div>
+
 
       <section class="game-actions" aria-label="Ações do turno">
         <button id="standBtn" class="action-button action-stand" type="button"><span class="action-symbol">✕</span><span><small>FICAR COM A MÃO</small><strong>PARAR</strong></span></button>
@@ -109,6 +128,6 @@
     </section>
   </main>
   <script src="/socket.io/socket.io.js"></script>
-  <script src="/app.js?v=5"></script>
+  <script src="/app.js?v=6"></script>
 </body>
 </html>

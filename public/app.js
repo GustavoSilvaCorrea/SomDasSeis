@@ -16,6 +16,10 @@ const codeLabel = $('#codeLabel');
 const copyCode = $('#copyCode');
 const soundToggle = $('#soundToggle');
 const statusText = $('#statusText');
+const myNewsTitle = $('#myNewsTitle');
+const myNewsBody = $('#myNewsBody');
+const enemyNewsTitle = $('#enemyNewsTitle');
+const enemyNewsBody = $('#enemyNewsBody');
 const playersEl = $('#players');
 const triumphsEl = $('#triumphs');
 const drawDeck = $('#drawDeck');
@@ -35,6 +39,7 @@ const PLAYER_NAME_KEY = 'somDaSeis21.playerName';
 const SOUND_KEY = 'somDaSeis21.soundEnabled';
 
 let state = null;
+let newsMemory = emptyNewsMemory();
 let currentRoomCode = localStorage.getItem(ROOM_CODE_KEY) || '';
 let playerId = localStorage.getItem(PLAYER_ID_KEY);
 let soundEnabled = localStorage.getItem(SOUND_KEY) !== 'false';
@@ -204,6 +209,7 @@ socket.on('roomError', payload => {
     currentRoomCode = '';
     localStorage.removeItem(ROOM_CODE_KEY);
     state = null;
+    newsMemory = emptyNewsMemory();
     game.classList.add('hidden');
     lobby.classList.remove('hidden');
   }
@@ -248,10 +254,12 @@ function detectSpentCoins(previous, next) {
 }
 
 socket.on('state', next => {
+  const previous = state;
   const freshCards = detectNewCards(state, next);
   const spentCoins = detectSpentCoins(state, next);
   const secondChance = Boolean(state && state.message !== next.message &&
     /Segunda Chance automaticamente/.test(next.message || ''));
+  updateNewsBoard(previous, next);
   state = next;
   currentRoomCode = next.code;
   localStorage.setItem(ROOM_CODE_KEY, next.code);
@@ -271,7 +279,7 @@ function canAct() {
 function render(spentCoins = []) {
   if (!state) return;
   codeLabel.textContent = state.code;
-  statusText.textContent = state.message || '';
+  statusText.textContent = newsBannerText(state);
   const myself = state.players.find(p => p.id === playerId);
   const opponent = state.players.find(p => p.id !== playerId);
   playersEl.innerHTML =
@@ -377,6 +385,117 @@ closeTriumphBtn.addEventListener('click', () => triumphDialog.close());
 triumphDialog.addEventListener('click', event => {
   if (event.target === triumphDialog) triumphDialog.close();
 });
+
+
+/* =============================================================
+   JORNAL DE AÇÕES — usa a mudança de estado (não apenas message).
+   O servidor troca às vezes "parou" por "É a vez de ..." no
+   mesmo evento; comparar estados preserva a manchete correta.
+   ============================================================= */
+function emptyNewsMemory() {
+  return {
+    mine: {
+      title: 'AGUARDANDO JOGADA',
+      body: 'Suas ações vão ganhar manchetes aqui.'
+    },
+    enemy: {
+      title: 'AGUARDANDO JOGADA',
+      body: 'As ações do adversário vão aparecer aqui.'
+    }
+  };
+}
+
+function writeNews(player, title, body) {
+  const side = player.id === playerId ? 'mine' : 'enemy';
+  newsMemory[side] = { title, body };
+}
+
+function updateNewsBoard(previous, next) {
+  const changedRoom = !previous || previous.code !== next.code;
+  const started = next.phase === 'playing' && previous?.phase !== 'playing';
+  const restarted = previous?.phase === 'finished' && next.phase === 'playing';
+  const returnedToLobby = previous?.phase !== 'waiting' && next.phase === 'waiting';
+  if (changedRoom || started || restarted || returnedToLobby) {
+    newsMemory = emptyNewsMemory();
+  }
+
+  const oldPlayers = new Map((changedRoom ? [] : previous?.players || []).map(p => [p.id, p]));
+  for (const player of next.players || []) {
+    const old = oldPlayers.get(player.id);
+    const story = findPlayerNews(old, player, started || changedRoom);
+    if (story) writeNews(player, story.title, story.body);
+  }
+
+  // O placar final é uma edição especial, distinta dos últimos lances.
+  if (next.phase === 'finished' && (changedRoom || previous?.phase !== 'finished')) {
+    for (const player of next.players || []) {
+      if (next.winnerId === null || next.winnerId === undefined) {
+        writeNews(player, 'EMPATE NA MESA!', 'O duelo terminou sem vencedor.');
+      } else if (next.winnerId === player.id) {
+        writeNews(player, 'VENCEU O DUELO!', `${player.name} levou a melhor nesta rodada.`);
+      } else {
+        writeNews(player, 'PERDEU O DUELO', `${player.name} não conseguiu superar o adversário.`);
+      }
+    }
+  }
+  paintNewsBoard();
+}
+
+function findPlayerNews(old, player, openingHand) {
+  if (openingHand && player.hand.length) {
+    return { title: 'CARTAS NA MESA!', body: `${player.name} recebeu sua mão inicial com ${player.score} pontos.` };
+  }
+  if (!old) {
+    return player.hand.length ? { title: 'ENTROU NA MESA', body: `${player.name} está pronto para o duelo.` } : null;
+  }
+  if (!old.connected && player.connected) {
+    return { title: 'VOLTOU À MESA', body: `${player.name} retomou seu lugar na partida.` };
+  }
+  if (old.connected && !player.connected) {
+    return { title: 'SAIU DA MESA', body: `${player.name} perdeu a conexão.` };
+  }
+
+  const spent = (id) => player.triumphs?.some(t => t.id === id && t.used &&
+    old.triumphs?.some(prev => prev.id === id && !prev.used));
+  if (spent('secondChance')) {
+    return { title: 'SEGUNDA CHANCE!', body: `${player.name} escapou do estouro e descartou a última carta.` };
+  }
+  if (spent('target24') || player.target > old.target) {
+    return { title: 'LIMITE AUMENTADO!', body: `${player.name} usou Além do Limite e agora pode chegar a ${player.target} pontos.` };
+  }
+  if (spent('drawPeek')) {
+    return { title: 'INSTINTO EM AÇÃO!', body: `${player.name} espiou a próxima carta do baralho.` };
+  }
+  if (!old.busted && player.busted) {
+    return { title: 'ESTOUROU!', body: `${player.name} passou do limite de ${player.target} pontos.` };
+  }
+  if (!old.stood && player.stood) {
+    return player.score === player.target
+      ? { title: `CRAVOU ${player.target}!`, body: `${player.name} atingiu exatamente o limite da rodada.` }
+      : { title: `PAROU EM ${player.score}`, body: `${player.name} decidiu não comprar mais cartas.` };
+  }
+  if (player.hand.length > old.hand.length) {
+    return { title: 'COMPROU UMA CARTA!', body: `${player.name} pediu outra carta e agora soma ${player.score} pontos.` };
+  }
+  return null;
+}
+
+function paintNewsBoard() {
+  if (!myNewsTitle || !enemyNewsTitle) return;
+  myNewsTitle.textContent = newsMemory.mine.title;
+  myNewsBody.textContent = newsMemory.mine.body;
+  enemyNewsTitle.textContent = newsMemory.enemy.title;
+  enemyNewsBody.textContent = newsMemory.enemy.body;
+}
+
+function newsBannerText(current) {
+  if (!socket.connected) return 'SEM CONEXÃO · TENTANDO VOLTAR';
+  if (current.phase === 'finished') return 'EDIÇÃO FINAL · RODADA ENCERRADA';
+  if (current.phase === 'waiting') return 'AGUARDANDO SEGUNDO JOGADOR';
+  const currentPlayer = current.players?.find(p => p.id === current.currentTurn);
+  return currentPlayer?.id === playerId ? 'SUA VEZ DE JOGAR' :
+    currentPlayer ? `VEZ DE ${currentPlayer.name.toUpperCase()}` : 'DUAS MÃOS · UM DUELO';
+}
 
 /* Carta fantasma percorre o caminho real: pilha -> lugar na mão. */
 function animateNewCards(freshMap) {
