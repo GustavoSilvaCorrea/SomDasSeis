@@ -16,10 +16,8 @@ const codeLabel = $('#codeLabel');
 const copyCode = $('#copyCode');
 const soundToggle = $('#soundToggle');
 const statusText = $('#statusText');
-const myNewsTitle = $('#myNewsTitle');
-const myNewsBody = $('#myNewsBody');
-const enemyNewsTitle = $('#enemyNewsTitle');
-const enemyNewsBody = $('#enemyNewsBody');
+const myNewsStack = $('#myNewsStack');
+const enemyNewsStack = $('#enemyNewsStack');
 const playersEl = $('#players');
 const triumphsEl = $('#triumphs');
 const drawDeck = $('#drawDeck');
@@ -40,6 +38,8 @@ const SOUND_KEY = 'somDaSeis21.soundEnabled';
 
 let state = null;
 let newsMemory = emptyNewsMemory();
+let newsSerial = 0;
+const lastPaintedNews = { mine: 0, enemy: 0 };
 let currentRoomCode = localStorage.getItem(ROOM_CODE_KEY) || '';
 let playerId = localStorage.getItem(PLAYER_ID_KEY);
 let soundEnabled = localStorage.getItem(SOUND_KEY) !== 'false';
@@ -209,7 +209,7 @@ socket.on('roomError', payload => {
     currentRoomCode = '';
     localStorage.removeItem(ROOM_CODE_KEY);
     state = null;
-    newsMemory = emptyNewsMemory();
+    resetNewsStacks();
     game.classList.add('hidden');
     lobby.classList.remove('hidden');
   }
@@ -388,26 +388,36 @@ triumphDialog.addEventListener('click', event => {
 
 
 /* =============================================================
-   JORNAL DE AÇÕES — usa a mudança de estado (não apenas message).
-   O servidor troca às vezes "parou" por "É a vez de ..." no
-   mesmo evento; comparar estados preserva a manchete correta.
+   JORNAIS FÍSICOS NO FELTRO
+   Cada alteração relevante cria uma NOVA edição. As edições ficam
+   guardadas durante a rodada e são renderizadas como uma pilha.
    ============================================================= */
 function emptyNewsMemory() {
-  return {
-    mine: {
-      title: 'AGUARDANDO JOGADA',
-      body: 'Suas ações vão ganhar manchetes aqui.'
-    },
-    enemy: {
-      title: 'AGUARDANDO JOGADA',
-      body: 'As ações do adversário vão aparecer aqui.'
-    }
-  };
+  return { mine: [], enemy: [] };
+}
+
+function resetNewsStacks() {
+  newsMemory = emptyNewsMemory();
+  newsSerial = 0;
+  lastPaintedNews.mine = 0;
+  lastPaintedNews.enemy = 0;
+  paintNewsBoard(new Set());
 }
 
 function writeNews(player, title, body) {
   const side = player.id === playerId ? 'mine' : 'enemy';
-  newsMemory[side] = { title, body };
+  const story = {
+    id: ++newsSerial,
+    edition: newsSerial,
+    title,
+    body,
+    playerName: player.name,
+    time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  };
+  newsMemory[side].push(story);
+  // Mantém o histórico da rodada sem deixar o DOM crescer sem limite.
+  if (newsMemory[side].length > 24) newsMemory[side].shift();
+  return side;
 }
 
 function updateNewsBoard(previous, next) {
@@ -415,35 +425,39 @@ function updateNewsBoard(previous, next) {
   const started = next.phase === 'playing' && previous?.phase !== 'playing';
   const restarted = previous?.phase === 'finished' && next.phase === 'playing';
   const returnedToLobby = previous?.phase !== 'waiting' && next.phase === 'waiting';
-  if (changedRoom || started || restarted || returnedToLobby) {
-    newsMemory = emptyNewsMemory();
+
+  if (changedRoom || restarted || returnedToLobby) {
+    resetNewsStacks();
   }
 
-  const oldPlayers = new Map((changedRoom ? [] : previous?.players || []).map(p => [p.id, p]));
+  const changedSides = new Set();
+  const oldPlayers = new Map((changedRoom || restarted ? [] : previous?.players || []).map(p => [p.id, p]));
+
   for (const player of next.players || []) {
     const old = oldPlayers.get(player.id);
-    const story = findPlayerNews(old, player, started || changedRoom);
-    if (story) writeNews(player, story.title, story.body);
+    const story = findPlayerNews(old, player, started || changedRoom || restarted);
+    if (story) changedSides.add(writeNews(player, story.title, story.body));
   }
 
-  // O placar final é uma edição especial, distinta dos últimos lances.
+  // Resultado final também vira uma edição e entra em cima da pilha.
   if (next.phase === 'finished' && (changedRoom || previous?.phase !== 'finished')) {
     for (const player of next.players || []) {
       if (next.winnerId === null || next.winnerId === undefined) {
-        writeNews(player, 'EMPATE NA MESA!', 'O duelo terminou sem vencedor.');
+        changedSides.add(writeNews(player, 'EMPATE NA MESA!', 'O duelo terminou sem vencedor.'));
       } else if (next.winnerId === player.id) {
-        writeNews(player, 'VENCEU O DUELO!', `${player.name} levou a melhor nesta rodada.`);
+        changedSides.add(writeNews(player, 'VENCEU O DUELO!', `${player.name} levou a melhor nesta rodada.`));
       } else {
-        writeNews(player, 'PERDEU O DUELO', `${player.name} não conseguiu superar o adversário.`);
+        changedSides.add(writeNews(player, 'PERDEU O DUELO', `${player.name} não conseguiu superar o adversário.`));
       }
     }
   }
-  paintNewsBoard();
+
+  paintNewsBoard(changedSides);
 }
 
 function findPlayerNews(old, player, openingHand) {
   if (openingHand && player.hand.length) {
-    return { title: 'CARTAS NA MESA!', body: `${player.name} recebeu sua mão inicial com ${player.score} pontos.` };
+    return { title: 'CARTAS NA MESA!', body: `${player.name} recebeu a mão inicial com ${player.score} pontos.` };
   }
   if (!old) {
     return player.hand.length ? { title: 'ENTROU NA MESA', body: `${player.name} está pronto para o duelo.` } : null;
@@ -455,8 +469,9 @@ function findPlayerNews(old, player, openingHand) {
     return { title: 'SAIU DA MESA', body: `${player.name} perdeu a conexão.` };
   }
 
-  const spent = (id) => player.triumphs?.some(t => t.id === id && t.used &&
+  const spent = id => player.triumphs?.some(t => t.id === id && t.used &&
     old.triumphs?.some(prev => prev.id === id && !prev.used));
+
   if (spent('secondChance')) {
     return { title: 'SEGUNDA CHANCE!', body: `${player.name} escapou do estouro e descartou a última carta.` };
   }
@@ -480,17 +495,66 @@ function findPlayerNews(old, player, openingHand) {
   return null;
 }
 
-function paintNewsBoard() {
-  if (!myNewsTitle || !enemyNewsTitle) return;
-  myNewsTitle.textContent = newsMemory.mine.title;
-  myNewsBody.textContent = newsMemory.mine.body;
-  enemyNewsTitle.textContent = newsMemory.enemy.title;
-  enemyNewsBody.textContent = newsMemory.enemy.body;
+function paintNewsBoard(changedSides = new Set()) {
+  renderNewspaperStack(myNewsStack, newsMemory.mine, 'mine', changedSides.has('mine'));
+  renderNewspaperStack(enemyNewsStack, newsMemory.enemy, 'enemy', changedSides.has('enemy'));
+}
+
+function renderNewspaperStack(container, stories, side, animateNewest) {
+  if (!container) return;
+
+  if (!stories.length) {
+    container.innerHTML = `
+      <div class="newspaper-empty">
+        <span>SEM EDIÇÕES</span>
+        <small>A próxima jogada cai aqui.</small>
+      </div>`;
+    return;
+  }
+
+  // Visualmente mostramos as 6 últimas folhas. O histórico continua em memória.
+  const visible = stories.slice(-6);
+  const newestId = visible[visible.length - 1]?.id || 0;
+  const previousNewest = lastPaintedNews[side];
+
+  container.innerHTML = visible.map((story, index) => {
+    const depthFromTop = visible.length - 1 - index;
+    const direction = side === 'mine' ? -1 : 1;
+    const rotationPattern = side === 'mine' ? [-4, 3, -2, 4, -3, 1] : [4, -3, 2, -4, 3, -1];
+    const rotation = rotationPattern[index % rotationPattern.length];
+    const offsetX = direction * depthFromTop * 3;
+    const offsetY = -depthFromTop * 4;
+    const isNewest = story.id === newestId;
+    const shouldDrop = isNewest && animateNewest && story.id !== previousNewest;
+    const hiddenCount = stories.length - visible.length;
+
+    return `
+      <article
+        class="newspaper-sheet ${isNewest ? 'newspaper-sheet--top' : ''} ${shouldDrop ? 'newspaper-sheet--drop' : ''}"
+        style="--paper-layer:${index};--paper-x:${offsetX}px;--paper-y:${offsetY}px;--paper-turn:${rotation}deg"
+        aria-label="${escapeHtml(story.title)}"
+      >
+        <header class="paper-masthead">
+          <span>SOM DA SEIS</span>
+          <b>GAZETTE</b>
+          <small>EDIÇÃO ${String(story.edition).padStart(2, '0')} · 1887 · ${story.time}</small>
+        </header>
+        <div class="paper-rule"></div>
+        <p class="paper-kicker">${side === 'mine' ? 'DA SUA PARTE DA MESA' : 'DO OUTRO LADO DA MESA'}</p>
+        <h3>${escapeHtml(story.title)}</h3>
+        <p class="paper-copy">${escapeHtml(story.body)}</p>
+        <div class="paper-columns" aria-hidden="true"><span></span><span></span><span></span></div>
+        <footer><span>♠</span><em>${escapeHtml(story.playerName)}</em><span>♠</span></footer>
+        ${isNewest && hiddenCount > 0 ? `<i class="paper-count">+${hiddenCount} antigas</i>` : ''}
+      </article>`;
+  }).join('');
+
+  lastPaintedNews[side] = newestId;
 }
 
 function newsBannerText(current) {
   if (!socket.connected) return 'SEM CONEXÃO · TENTANDO VOLTAR';
-  if (current.phase === 'finished') return 'EDIÇÃO FINAL · RODADA ENCERRADA';
+  if (current.phase === 'finished') return 'RODADA ENCERRADA';
   if (current.phase === 'waiting') return 'AGUARDANDO SEGUNDO JOGADOR';
   const currentPlayer = current.players?.find(p => p.id === current.currentTurn);
   return currentPlayer?.id === playerId ? 'SUA VEZ DE JOGAR' :

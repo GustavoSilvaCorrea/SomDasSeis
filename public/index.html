@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Rye&family=Special+Elite&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/style.css?v=6" />
+  <link rel="stylesheet" href="/style.css?v=7" />
 </head>
 <body>
   <div class="film-grain" aria-hidden="true"></div>
@@ -53,28 +53,8 @@
         </div>
       </header>
 
-      <!-- Diário da partida: cada lado registra o último acontecimento daquele jogador. -->
-      <section class="news-wrapper" aria-label="Jornal de acontecimentos da mesa">
-        <header class="news-header">
-          <span class="news-edition">EDIÇÃO EXTRA · 1887</span>
-          <h2>SOM DA SEIS GAZETTE</h2>
-          <span id="statusText" class="news-status" role="status" aria-live="polite">Aguardando...</span>
-        </header>
-        <div class="news-grid">
-          <article class="news-column news-column--mine" aria-label="Suas ações">
-            <span class="news-byline">DA SUA PARTE DA MESA</span>
-            <h3 id="myNewsTitle" class="news-title" aria-live="polite">AGUARDANDO JOGADA</h3>
-            <p id="myNewsBody" class="news-copy">Suas ações vão ganhar manchetes aqui.</p>
-          </article>
-          <div class="news-gutter" aria-hidden="true"><span>EXTRA</span></div>
-          <article class="news-column news-column--opponent" aria-label="Ações do adversário">
-            <span class="news-byline">DO OUTRO LADO DA MESA</span>
-            <h3 id="enemyNewsTitle" class="news-title" aria-live="polite">AGUARDANDO JOGADA</h3>
-            <p id="enemyNewsBody" class="news-copy">As ações do adversário vão aparecer aqui.</p>
-          </article>
-        </div>
-        <footer class="news-footer"><span>♠</span> AS ÚLTIMAS DA MESA <span>♠</span></footer>
-      </section>
+      <!-- Só o estado geral fica fora da mesa; as ações viram jornais físicos no feltro. -->
+      <div id="statusText" class="turn-notice" role="status" aria-live="polite">Aguardando...</div>
 
       <section class="table-area" aria-label="Mesa de cartas">
         <div class="table-rim">
@@ -82,6 +62,17 @@
             <div class="table-stitch" aria-hidden="true"></div>
             <span class="corner-flourish corner-flourish--tl" aria-hidden="true">❧</span>
             <span class="corner-flourish corner-flourish--br" aria-hidden="true">❧</span>
+
+            <!-- Cada jogada vira uma edição física; a mais nova cai sobre as anteriores. -->
+            <aside class="newspaper-zone newspaper-zone--mine" aria-label="Pilha das suas notícias">
+              <span class="newspaper-zone-label">SUAS NOTÍCIAS</span>
+              <div id="myNewsStack" class="newspaper-stack" role="log" aria-live="polite"></div>
+            </aside>
+
+            <aside class="newspaper-zone newspaper-zone--enemy" aria-label="Pilha das notícias do oponente">
+              <span class="newspaper-zone-label">NOTÍCIAS DO OPONENTE</span>
+              <div id="enemyNewsStack" class="newspaper-stack" role="log" aria-live="polite"></div>
+            </aside>
 
             <!-- Pequenas plaquinhas e cartas no feltro, sem containers de jogadores. -->
             <div id="players" class="players" aria-live="polite"></div>
@@ -128,6 +119,6 @@
     </section>
   </main>
   <script src="/socket.io/socket.io.js"></script>
-  <script src="/app.js?v=6"></script>
+  <script src="/app.js?v=7"></script>
 </body>
 </html>
